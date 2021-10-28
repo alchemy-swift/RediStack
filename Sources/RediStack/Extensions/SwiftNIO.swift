@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import NIO
+import NIOSSL
 
 // MARK: Convenience extensions
 
@@ -128,13 +129,29 @@ extension ClientBootstrap {
     ///
     /// See also `Channel.addBaseRedisHandlers()`.
     /// - Parameter group: The `EventLoopGroup` to create the `ClientBootstrap` with.
+    /// - Parameter tlsHostname: Optional tlsHostname to use during validation. This value is required when passing a tlsConfiguration
+    /// object since without a hostname a correct TLS connection cannot be established.
+    /// - Parameter tlsConfiguration: Optional tlsConfiguration object in order for enabling a TLS connection
     /// - Returns: A TCP connection with the base configuration of a `Channel` pipeline for RESP messages.
-    public static func makeRedisTCPClient(group: EventLoopGroup) -> ClientBootstrap {
+    public static func makeRedisTCPClient(group: EventLoopGroup, tls: (hostname: String, config: TLSConfiguration)? = nil) -> ClientBootstrap {
         return ClientBootstrap(group: group)
             .channelOption(
                 ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR),
                 value: 1
             )
-            .channelInitializer { $0.addBaseRedisHandlers() }
+            .channelInitializer { channel in
+                guard let tls = tls else {
+                    return channel.addBaseRedisHandlers()
+                }
+                do {
+                    let sslContext = try NIOSSLContext(configuration: tls.config)
+                    return EventLoopFuture.andAllSucceed([
+                        channel.pipeline.addHandler(try NIOSSLClientHandler(context: sslContext, serverHostname: tls.hostname)),
+                        channel.addBaseRedisHandlers()
+                    ], on: channel.eventLoop)
+                } catch {
+                    return channel.eventLoop.makeFailedFuture(error)
+                }
+            }
     }
 }

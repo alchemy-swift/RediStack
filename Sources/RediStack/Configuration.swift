@@ -15,6 +15,7 @@
 import Foundation
 import Logging
 import NIO
+import NIOSSL
 
 extension RedisConnection.Configuration {
     public struct ValidationError: LocalizedError, Equatable {
@@ -83,6 +84,8 @@ extension RedisConnection {
         public let password: String?
         /// The initial database index that the connection should use.
         public let initialDatabase: Int?
+        /// Connect using an SSL handler
+        public let tlsConfiguration: TLSConfiguration?
         /// The logger prototype that will be used by the connection by default when generating logs.
         public let defaultLogger: Logger
         
@@ -101,7 +104,8 @@ extension RedisConnection {
             address: SocketAddress,
             password: String? = nil,
             initialDatabase: Int? = nil,
-            defaultLogger: Logger? = nil
+            defaultLogger: Logger? = nil,
+            tlsConfiguration: TLSConfiguration? = nil
         ) throws {
             if initialDatabase != nil && initialDatabase! < 0 {
                 throw ValidationError.outOfBoundsDatabaseID
@@ -110,6 +114,7 @@ extension RedisConnection {
             self.address = address
             self.password = password
             self.initialDatabase = initialDatabase
+            self.tlsConfiguration = tlsConfiguration
             self.defaultLogger = defaultLogger ?? Configuration.defaultLogger
         }
 
@@ -130,7 +135,8 @@ extension RedisConnection {
             port: Int = Self.defaultPort,
             password: String? = nil,
             initialDatabase: Int? = nil,
-            defaultLogger: Logger? = nil
+            defaultLogger: Logger? = nil,
+            tlsConfiguration: TLSConfiguration? = nil
         ) throws {
             try self.init(
                 address: try .makeAddressResolvingHost(hostname, port: port),
@@ -158,9 +164,9 @@ extension RedisConnection {
         /// - Throws:
         ///     - `RedisConnection.Configuration.ValidationError` if required URL components are invalid or missing.
         ///     - `NIO.SocketAddressError` if hostname resolution fails.
-        public init(url string: String, defaultLogger: Logger? = nil) throws {
+        public init(url string: String, defaultLogger: Logger? = nil, tlsConfiguration: TLSConfiguration? = nil) throws {
             guard let url = URL(string: string) else { throw ValidationError.invalidURLString }
-            try self.init(url: url, defaultLogger: defaultLogger)
+            try self.init(url: url, defaultLogger: defaultLogger, tlsConfiguration: tlsConfiguration)
         }
 
         /// Creates a new connection configuration from the provided URL object.
@@ -178,7 +184,7 @@ extension RedisConnection {
         /// - Throws:
         ///     - `RedisConnection.Configuration.ValidationError` if required URL components are invalid or missing.
         ///     - `NIO.SocketAddressError` if hostname resolution fails.
-        public init(url: URL, defaultLogger: Logger? = nil) throws {
+        public init(url: URL, defaultLogger: Logger? = nil, tlsConfiguration: TLSConfiguration? = nil) throws {
             try Self.validateRedisURL(url)
 
             guard let host = url.host, !host.isEmpty else { throw ValidationError.missingURLHost }
@@ -189,7 +195,8 @@ extension RedisConnection {
                 address: try .makeAddressResolvingHost(host, port: url.port ?? Self.defaultPort),
                 password: url.password,
                 initialDatabase: databaseID,
-                defaultLogger: defaultLogger
+                defaultLogger: defaultLogger,
+                tlsConfiguration: tlsConfiguration
             )
         }
 
@@ -217,6 +224,7 @@ extension RedisConnectionPool {
         public let connectionPassword: String?
         /// The initial database index that connections should use.
         public let connectionInitialDatabase: Int?
+        public let tlsConfiguration: TLSConfiguration?
         /// The pre-configured TCP client for connections to use.
         public let tcpClient: ClientBootstrap?
     
@@ -232,11 +240,13 @@ extension RedisConnectionPool {
             connectionInitialDatabase: Int? = nil,
             connectionPassword: String? = nil,
             connectionDefaultLogger: Logger? = nil,
+            tlsConfiguration: TLSConfiguration? = nil,
             tcpClient: ClientBootstrap? = nil
         ) {
             self.connectionInitialDatabase = connectionInitialDatabase
             self.connectionPassword = connectionPassword
             self.connectionDefaultLogger = connectionDefaultLogger ?? RedisConnection.Configuration.defaultLogger
+            self.tlsConfiguration = tlsConfiguration
             self.tcpClient = tcpClient
         }
     }

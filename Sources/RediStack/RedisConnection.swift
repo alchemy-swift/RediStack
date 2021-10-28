@@ -51,9 +51,18 @@ extension RedisConnection {
     public static func make(
         configuration config: Configuration,
         boundEventLoop eventLoop: EventLoop,
-        configuredTCPClient client: ClientBootstrap? = nil
+        configuredTCPClient clientBootstrap: ClientBootstrap? = nil
     ) -> EventLoopFuture<RedisConnection> {
-        let client = client ?? .makeRedisTCPClient(group: eventLoop)
+        let client: ClientBootstrap
+        if let tlsConfiguration = config.tlsConfiguration {
+            guard let hostname = config.hostname else {
+                return eventLoop.makeFailedFuture(RedisError.init(reason: "Unable to create a RedisConnection over TLS without a valid hostname"))
+            }
+            let tls = (hostname: hostname, config: tlsConfiguration)
+            client = .makeRedisTCPClient(group: eventLoop, tls: tls)
+        } else {
+            client = clientBootstrap ?? .makeRedisTCPClient(group: eventLoop)
+        }
         
         var future = client
             .connect(to: config.address)

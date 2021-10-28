@@ -192,7 +192,8 @@ extension RedisConnectionPool {
                 address: nextTarget,
                 password: factoryConfig.connectionPassword,
                 initialDatabase: factoryConfig.connectionInitialDatabase,
-                defaultLogger: factoryConfig.connectionDefaultLogger
+                defaultLogger: factoryConfig.connectionDefaultLogger,
+                tlsConfiguration: factoryConfig.tlsConfiguration
             )
         } catch {
             // config validation failed, return the error
