@@ -142,7 +142,8 @@ extension RedisConnection {
                 address: try .makeAddressResolvingHost(hostname, port: port),
                 password: password,
                 initialDatabase: initialDatabase,
-                defaultLogger: defaultLogger
+                defaultLogger: defaultLogger,
+                tlsConfiguration: tlsConfiguration
             )
         }
 
